@@ -18,7 +18,7 @@ export function errorHandler(err, req, res, next) {
     if (!err.statusCode && err.code) {
         if (err.code === "23505") {
             statusCode = 409;
-            message = "Conflicto de unicidad";
+            message = "Ya existe un usuario con ese email";
         } else if (err.code === "23503") {
             statusCode = 404;
             message = "Referencia no encontrada";
