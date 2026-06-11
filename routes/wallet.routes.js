@@ -1,5 +1,5 @@
 import express from "express";
-import { getWallet, deposit, withdraw, exchange } from "../services/walletService.js";
+import { getWallet, deposit, withdraw, exchange, getTransactions } from "../services/walletService.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { badRequest } from "../error/errorHandler.js";
 
@@ -31,6 +31,11 @@ walletRouter.post("/exchange", requireAuth, asyncHandler(async (req, res, next) 
     if (!from || !to || !amount || amount <= 0) return next(badRequest("Datos inválidos"));
     if (from === to) return next(badRequest("Las monedas deben ser diferentes"));
     const result = await exchange({ userId: req.user.id, fromCode: from, toCode: to, amount });
+    res.status(200).json(result);
+}));
+
+walletRouter.get("/transactions", requireAuth, asyncHandler(async (req, res) => {
+    const result = await getTransactions(req.user.id);
     res.status(200).json(result);
 }));
 

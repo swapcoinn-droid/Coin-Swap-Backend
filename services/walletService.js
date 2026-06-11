@@ -249,3 +249,45 @@ export async function exchange({ userId, fromCode, toCode, amount }) {
         client.release();
     }
 }
+
+export async function getTransactions(userId) {
+    const walletResult = await pool.query(
+        `SELECT id FROM wallet WHERE user_id = $1`,
+        [userId]
+    );
+    if (!walletResult.rows[0]) throw notFound("Wallet no encontrada");
+    const walletId = walletResult.rows[0].id;
+
+    const result = await pool.query(
+        `SELECT 
+            t.id,
+            t.type,
+            t.amount,
+            t.description,
+            t.exchange_rate,
+            t.created_at,
+            c.code  AS currency,
+            c.symbol AS currency_symbol,
+            tc.code  AS target_currency,
+            tc.symbol AS target_currency_symbol
+         FROM transaction t
+         JOIN currency c  ON c.id  = t.currency_id
+         LEFT JOIN currency tc ON tc.id = t.target_currency_id
+         WHERE t.source_wallet_id = $1
+         ORDER BY t.created_at DESC`,
+        [walletId]
+    );
+
+    return result.rows.map(row => ({
+        id: row.id,
+        type: row.type,
+        amount: Number(row.amount),
+        currency: row.currency,
+        currencySymbol: row.currency_symbol,
+        targetCurrency: row.target_currency || null,
+        targetCurrencySymbol: row.target_currency_symbol || null,
+        exchangeRate: row.exchange_rate ? Number(row.exchange_rate) : null,
+        description: row.description,
+        createdAt: row.created_at
+    }));
+}
