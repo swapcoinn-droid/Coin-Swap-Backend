@@ -2,6 +2,7 @@ import express from "express";
 import { getWallet, deposit, withdraw, exchange, getTransactions } from "../services/walletService.js";
 import { sanitizeAmount, sanitizePagination } from "../middleware/validate.middleware.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
+import { exchangeLimiter } from "../middleware/rateLimit.middleware.js";
 import { badRequest } from "../error/errorHandler.js";
 
 const walletRouter = express.Router();
@@ -27,7 +28,7 @@ walletRouter.post("/withdraw", requireAuth, sanitizeAmount, asyncHandler(async (
     res.status(200).json(result);
 }));
 
-walletRouter.post("/exchange", requireAuth, sanitizeAmount, asyncHandler(async (req, res, next) => {
+walletRouter.post("/exchange", requireAuth, exchangeLimiter, sanitizeAmount, asyncHandler(async (req, res, next) => {
     const { from, to, amount } = req.body;
     if (!from || !to || !amount || amount <= 0) return next(badRequest("Datos inválidos"));
     if (from === to) return next(badRequest("Las monedas deben ser diferentes"));

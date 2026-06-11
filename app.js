@@ -4,14 +4,12 @@ import authRouter from './routes/auth.routes.js';
 import ratesRouter from "./routes/rates.routes.js";
 import walletRouter from "./routes/wallet.routes.js";
 import goalsRouter from "./routes/goals.routes.js";
+import { generalLimiter, authLimiter } from "./middleware/rateLimit.middleware.js";
 import { errorHandler } from "./error/errorHandler.js";
 
 const app = express();
 
-app.use(express.json());
-
-app.use("/api/rates", ratesRouter);
-
+// CORS para permitir peticiones desde origenes específicos
 app.use(cors({
     origin: [
         'http://localhost:3000',
@@ -22,9 +20,19 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use("/api/auth", authRouter);
+// Para parsear el cuerpo de las peticiones JSON
+app.use(express.json());
+
+// Rate limiter general para todas las rutas
+app.use(generalLimiter);
+
+// Rutas autenticadas con su propio rate limiter
+app.use("/api/auth", authLimiter, authRouter);
+app.use("/api/rates", ratesRouter);
 app.use("/api/wallet", walletRouter);
 app.use("/api/goals", goalsRouter);
+
+// Manejo de errores
 app.use(errorHandler);
 
 export default app;
