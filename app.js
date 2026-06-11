@@ -20,12 +20,9 @@ const swaggerDocument = YAML.parse(readFileSync(join(__dirname, "openapi.yaml"),
 
 // CORS para permitir peticiones desde origenes específicos
 app.use(cors({
-    origin: [
+    origin: process.env.NODE_ENV === 'production' ? '*' : [
         'http://localhost:3000',
         'http://localhost:5173',
-        'https://swap-coin-frontend.vercel.app',
-        'https://coin-swap-backend-production.up.railway.app',
-        'https://railway.com'
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
