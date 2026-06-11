@@ -23,7 +23,8 @@ app.use(cors({
     origin: [
         'http://localhost:3000',
         'http://localhost:5173',
-        'https://swap-coin-frontend.vercel.app'
+        'https://swap-coin-frontend.vercel.app',
+        'https://coin-swap-backend-production.up.railway.app'
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
