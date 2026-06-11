@@ -1,11 +1,15 @@
 import express from "express";
 import cors from "cors";
 import authRouter from './routes/auth.routes.js';
+import ratesRouter from "./routes/rates.routes.js";
+import walletRouter from "./routes/wallet.routes.js";
 import { errorHandler } from "./error/errorHandler.js";
 
 const app = express();
 
 app.use(express.json());
+
+app.use("/api/rates", ratesRouter);
 
 app.use(cors({
     origin: [
@@ -18,7 +22,7 @@ app.use(cors({
 }));
 
 app.use("/api/auth", authRouter);
-
+app.use("/api/wallet", walletRouter);
 app.use(errorHandler);
 
 export default app;
