@@ -1,6 +1,6 @@
 import pool from "../db/config.js";
-import { convert } from "./exchangeRateService.js";
-import { notFound } from "../error/errorHandler.js";
+import { getRates, convert } from "./exchangeRateService.js";
+import { notFound, badRequest } from "../error/errorHandler.js";
 
 export async function getWallet(userId) {
     // Obtener la wallet
@@ -42,4 +42,210 @@ export async function getWallet(userId) {
         balances,
         totalEstimatedCOP: +totalCOP.toFixed(2)
     };
+}
+
+export async function deposit({ userId, amount, currencyCode = "COP" }) {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        // Obtener la wallet
+        const walletResult = await client.query(
+            `SELECT id FROM wallet WHERE user_id = $1`,
+            [userId]
+        );
+        if (!walletResult.rows[0]) throw notFound("Wallet no encontrada");
+        const walletId = walletResult.rows[0].id;
+
+        // Obtener la moneda
+        const currencyResult = await client.query(
+            `SELECT id FROM currency WHERE code = $1`,
+            [currencyCode]
+        );
+        if (!currencyResult.rows[0]) throw badRequest("Moneda no válida");
+        const currencyId = currencyResult.rows[0].id;
+
+        // Actualizar balance
+        const balanceResult = await client.query(
+            `UPDATE balance SET amount = amount + $1
+             WHERE wallet_id = $2 AND currency_id = $3
+             RETURNING amount`,
+            [amount, walletId, currencyId]
+        );
+
+        // Insertar registro de transacción
+        await client.query(
+            `INSERT INTO transaction
+             (type, amount, currency_id, source_wallet_id, description)
+             VALUES ('deposit', $1, $2, $3, $4)`,
+            [amount, currencyId, walletId, `Depósito de ${amount} ${currencyCode}`]
+        );
+
+        await client.query("COMMIT");
+        return {
+            currency: currencyCode,
+            deposited: amount,
+            newBalance: Number(balanceResult.rows[0].amount)
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+export async function withdraw({ userId, amount, currencyCode = "COP" }) {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        // Obtener la wallet
+        const walletResult = await client.query(
+            `SELECT id FROM wallet WHERE user_id = $1`,
+            [userId]
+        );
+        if (!walletResult.rows[0]) throw notFound("Wallet no encontrada");
+        const walletId = walletResult.rows[0].id;
+
+        // Obtener la moneda
+        const currencyResult = await client.query(
+            `SELECT id FROM currency WHERE code = $1`,
+            [currencyCode]
+        );
+        if (!currencyResult.rows[0]) throw badRequest("Moneda no válida");
+        const currencyId = currencyResult.rows[0].id;
+
+        // Verificar que el balance sea suficiente antes de hacer algop
+        const balanceCheck = await client.query(
+            `SELECT amount FROM balance
+             WHERE wallet_id = $1 AND currency_id = $2`,
+            [walletId, currencyId]
+        );
+        if (Number(balanceCheck.rows[0].amount) < amount) {
+            throw badRequest("Saldo insuficiente");
+        }
+
+        // Actualizar el balance
+        const balanceResult = await client.query(
+            `UPDATE balance SET amount = amount - $1
+             WHERE wallet_id = $2 AND currency_id = $3
+             RETURNING amount`,
+            [amount, walletId, currencyId]
+        );
+
+        // Insertar registro de transacción
+        await client.query(
+            `INSERT INTO transaction
+             (type, amount, currency_id, source_wallet_id, description)
+             VALUES ('withdrawal', $1, $2, $3, $4)`,
+            [amount, currencyId, walletId, `Retiro de ${amount} ${currencyCode}`]
+        );
+
+        await client.query("COMMIT");
+        return {
+            currency: currencyCode,
+            withdrawn: amount,
+            newBalance: Number(balanceResult.rows[0].amount)
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+export async function exchange({ userId, fromCode, toCode, amount }) {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        // Obtener la wallet
+        const walletResult = await client.query(
+            `SELECT id FROM wallet WHERE user_id = $1`,
+            [userId]
+        );
+        if (!walletResult.rows[0]) throw notFound("Wallet no encontrada");
+        const walletId = walletResult.rows[0].id;
+
+        // Obtener ambas monedas
+        const currencyResult = await client.query(
+            `SELECT id, code FROM currency WHERE code = ANY($1)`,
+            [[fromCode, toCode]]
+        );
+        if (currencyResult.rows.length < 2) throw badRequest("Moneda no válida");
+        const fromCurrency = currencyResult.rows.find(c => c.code === fromCode);
+        const toCurrency = currencyResult.rows.find(c => c.code === toCode);
+
+        // Verificar el balance de la moneda seleccionada
+        const balanceCheck = await client.query(
+            `SELECT amount FROM balance
+             WHERE wallet_id = $1 AND currency_id = $2`,
+            [walletId, fromCurrency.id]
+        );
+        if (Number(balanceCheck.rows[0].amount) < amount) {
+            throw badRequest("Saldo insuficiente");
+        }
+
+        // Obtener el rate en tiempo real y calcular el monto recibido
+        const rates = await getRates();
+        const receivedAmount = await convert(amount, fromCode, toCode);
+        const appliedRate = +(rates[toCode] / rates[fromCode]).toFixed(6);
+
+        // Restar el monto de la moneda seleccionada
+        await client.query(
+            `UPDATE balance SET amount = amount - $1
+             WHERE wallet_id = $2 AND currency_id = $3`,
+            [amount, walletId, fromCurrency.id]
+        );
+
+        // Sumar el monto de la moneda seleccionada
+        await client.query(
+            `UPDATE balance SET amount = amount + $1
+             WHERE wallet_id = $2 AND currency_id = $3`,
+            [receivedAmount, walletId, toCurrency.id]
+        );
+
+        // Insertar registro de transacción
+        const txnResult = await client.query(
+            `INSERT INTO transaction
+             (type, amount, currency_id, source_wallet_id, description, exchange_rate, target_currency_id)
+             VALUES ('exchange', $1, $2, $3, $4, $5, $6)
+             RETURNING id`,
+            [
+                amount,
+                fromCurrency.id,
+                walletId,
+                `Exchange ${amount} ${fromCode} → ${receivedAmount} ${toCode}`,
+                appliedRate,
+                toCurrency.id
+            ]
+        );
+        const txnId = txnResult.rows[0].id;
+
+        // Registro del double-entry ledger
+        await client.query(
+            `INSERT INTO ledger_entry (transaction_id, wallet_id, currency_id, amount, entry_type)
+             VALUES ($1, $2, $3, $4, 'debit')`,
+            [txnId, walletId, fromCurrency.id, -amount]
+        );
+        await client.query(
+            `INSERT INTO ledger_entry (transaction_id, wallet_id, currency_id, amount, entry_type)
+             VALUES ($1, $2, $3, $4, 'credit')`,
+            [txnId, walletId, toCurrency.id, receivedAmount]
+        );
+
+        await client.query("COMMIT");
+        return {
+            from: { currency: fromCode, debited: amount },
+            to: { currency: toCode, credited: receivedAmount },
+            appliedRate
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
 }
