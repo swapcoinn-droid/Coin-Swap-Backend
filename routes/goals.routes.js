@@ -1,13 +1,14 @@
 import express from "express";
 import { getGoals, createGoal, contributeToGoal, withdrawFromGoal, deleteGoal } from "../services/goalsService.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
+import { sanitizeAmount, sanitizePagination } from "../middleware/validate.middleware.js";
 import { badRequest } from "../error/errorHandler.js";
 
 const goalsRouter = express.Router();
 const asyncHandler = (fn) => (req, res, next) =>
     Promise.resolve(fn(req, res, next)).catch(next);
 
-goalsRouter.get("/", requireAuth, asyncHandler(async (req, res) => {
+goalsRouter.get("/", requireAuth, sanitizePagination, asyncHandler(async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const result = await getGoals(req.user.id, { page: +page, limit: +limit });
     res.status(200).json(result);
@@ -27,7 +28,7 @@ goalsRouter.post("/", requireAuth, asyncHandler(async (req, res, next) => {
     res.status(201).json(result);
 }));
 
-goalsRouter.post("/:id/contribute", requireAuth, asyncHandler(async (req, res, next) => {
+goalsRouter.post("/:id/contribute", requireAuth, sanitizeAmount, asyncHandler(async (req, res, next) => {
     const { amount } = req.body;
     const goalId = parseInt(req.params.id);
     if (!amount || amount <= 0) return next(badRequest("Monto inválido"));
@@ -36,7 +37,7 @@ goalsRouter.post("/:id/contribute", requireAuth, asyncHandler(async (req, res, n
     res.status(200).json(result);
 }));
 
-goalsRouter.post("/:id/withdraw", requireAuth, asyncHandler(async (req, res, next) => {
+goalsRouter.post("/:id/withdraw", requireAuth, sanitizeAmount, asyncHandler(async (req, res, next) => {
     const { amount } = req.body;
     const goalId = parseInt(req.params.id);
     if (!amount || amount <= 0) return next(badRequest("Monto inválido"));
