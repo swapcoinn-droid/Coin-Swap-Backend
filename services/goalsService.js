@@ -1,13 +1,21 @@
 import pool from "../db/config.js";
 import { notFound, badRequest } from "../error/errorHandler.js";
 
-export async function getGoals(userId) {
+export async function getGoals(userId, { page = 1, limit = 10 } = {}) {
     const walletResult = await pool.query(
         `SELECT id FROM wallet WHERE user_id = $1`,
         [userId]
     );
     if (!walletResult.rows[0]) throw notFound("Wallet no encontrada");
     const walletId = walletResult.rows[0].id;
+
+    const offset = (page - 1) * limit;
+
+    const countResult = await pool.query(
+        `SELECT COUNT(*) FROM savings_goal WHERE wallet_id = $1`,
+        [walletId]
+    );
+    const total = parseInt(countResult.rows[0].count);
 
     const result = await pool.query(
         `SELECT
@@ -23,22 +31,33 @@ export async function getGoals(userId) {
          FROM savings_goal g
          JOIN currency c ON c.id = g.currency_id
          WHERE g.wallet_id = $1
-         ORDER BY g.created_at DESC`,
-        [walletId]
+         ORDER BY g.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [walletId, limit, offset]
     );
 
-    return result.rows.map(row => ({
-        id: row.id,
-        name: row.name,
-        currency: row.currency,
-        currencySymbol: row.currency_symbol,
-        targetAmount: Number(row.target_amount),
-        currentAmount: Number(row.current_amount),
-        progress: +((Number(row.current_amount) / Number(row.target_amount)) * 100).toFixed(2),
-        targetDate: row.target_date,
-        status: row.status,
-        createdAt: row.created_at
-    }));
+    return {
+        data: result.rows.map(row => ({
+            id: row.id,
+            name: row.name,
+            currency: row.currency,
+            currencySymbol: row.currency_symbol,
+            targetAmount: Number(row.target_amount),
+            currentAmount: Number(row.current_amount),
+            progress: +((Number(row.current_amount) / Number(row.target_amount)) * 100).toFixed(2),
+            targetDate: row.target_date,
+            status: row.status,
+            createdAt: row.created_at
+        })),
+        pagination: {
+            total,
+            page: +page,
+            limit: +limit,
+            totalPages: Math.ceil(total / limit),
+            hasNextPage: page * limit < total,
+            hasPrevPage: page > 1
+        }
+    };
 }
 
 export async function createGoal({ userId, name, targetAmount, currencyCode = "COP", targetDate }) {

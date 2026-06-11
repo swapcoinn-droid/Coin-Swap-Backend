@@ -35,7 +35,8 @@ walletRouter.post("/exchange", requireAuth, asyncHandler(async (req, res, next) 
 }));
 
 walletRouter.get("/transactions", requireAuth, asyncHandler(async (req, res) => {
-    const result = await getTransactions(req.user.id);
+    const { page = 1, limit = 10 } = req.query;
+    const result = await getTransactions(req.user.id, { page: +page, limit: +limit });
     res.status(200).json(result);
 }));
 

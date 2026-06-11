@@ -250,13 +250,21 @@ export async function exchange({ userId, fromCode, toCode, amount }) {
     }
 }
 
-export async function getTransactions(userId) {
+export async function getTransactions(userId, { page = 1, limit = 10 } = {}) {
     const walletResult = await pool.query(
         `SELECT id FROM wallet WHERE user_id = $1`,
         [userId]
     );
     if (!walletResult.rows[0]) throw notFound("Wallet no encontrada");
     const walletId = walletResult.rows[0].id;
+
+    const offset = (page - 1) * limit;
+
+    const countResult = await pool.query(
+        `SELECT COUNT(*) FROM transaction WHERE source_wallet_id = $1`,
+        [walletId]
+    );
+    const total = parseInt(countResult.rows[0].count);
 
     const result = await pool.query(
         `SELECT 
@@ -266,28 +274,39 @@ export async function getTransactions(userId) {
             t.description,
             t.exchange_rate,
             t.created_at,
-            c.code  AS currency,
+            c.code AS currency,
             c.symbol AS currency_symbol,
-            tc.code  AS target_currency,
+            tc.code AS target_currency,
             tc.symbol AS target_currency_symbol
          FROM transaction t
-         JOIN currency c  ON c.id  = t.currency_id
+         JOIN currency c ON c.id = t.currency_id
          LEFT JOIN currency tc ON tc.id = t.target_currency_id
          WHERE t.source_wallet_id = $1
-         ORDER BY t.created_at DESC`,
-        [walletId]
+         ORDER BY t.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [walletId, limit, offset]
     );
 
-    return result.rows.map(row => ({
-        id: row.id,
-        type: row.type,
-        amount: Number(row.amount),
-        currency: row.currency,
-        currencySymbol: row.currency_symbol,
-        targetCurrency: row.target_currency || null,
-        targetCurrencySymbol: row.target_currency_symbol || null,
-        exchangeRate: row.exchange_rate ? Number(row.exchange_rate) : null,
-        description: row.description,
-        createdAt: row.created_at
-    }));
+    return {
+        data: result.rows.map(row => ({
+            id: row.id,
+            type: row.type,
+            amount: Number(row.amount),
+            currency: row.currency,
+            currencySymbol: row.currency_symbol,
+            targetCurrency: row.target_currency || null,
+            targetCurrencySymbol: row.target_currency_symbol || null,
+            exchangeRate: row.exchange_rate ? Number(row.exchange_rate) : null,
+            description: row.description,
+            createdAt: row.created_at
+        })),
+        pagination: {
+            total,
+            page: +page,
+            limit: +limit,
+            totalPages: Math.ceil(total / limit),
+            hasNextPage: page * limit < total,
+            hasPrevPage: page > 1
+        }
+    };
 }
