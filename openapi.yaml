@@ -1,0 +1,854 @@
+openapi: 3.0.3
+info:
+  title: Swap Coin API
+  description: |
+    REST API para la billetera digital de Swap Coin. Soporta balances en múltiples monedas (COP, USD, EUR),
+    tasas de cambio en tiempo real, historial de transacciones y metas de ahorro.
+  version: 1.0.0
+  contact:
+    name: Swap Coin Backend
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+  - url: https://swap-coin-backend.railway.app/api
+    description: Production (Railway)
+
+tags:
+  - name: Auth
+    description: Registro e inicio de sesión de usuarios
+  - name: Rates
+    description: Tasas de cambio en tiempo real
+  - name: Wallet
+    description: Saldos, depósitos, retiros y cambio de divisas
+  - name: Goals
+    description: Gestión de metas de ahorro
+
+# Reusable components 
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # Generic 
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Credenciales inválidas
+        status:
+          type: integer
+          example: 401
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 42
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        totalPages:
+          type: integer
+          example: 5
+        hasNextPage:
+          type: boolean
+          example: true
+        hasPrevPage:
+          type: boolean
+          example: false
+
+    # Auth
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          example: María García
+        email:
+          type: string
+          format: email
+          example: maria@example.com
+        password:
+          type: string
+          minLength: 6
+          example: secret123
+
+    RegisterResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 7
+        name:
+          type: string
+          example: María García
+        email:
+          type: string
+          example: maria@example.com
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-06-01T14:23:00Z"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: maria@example.com
+        password:
+          type: string
+          example: secret123
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT valido por 24 horas
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 7
+            name:
+              type: string
+              example: María García
+            email:
+              type: string
+              example: maria@example.com
+
+    # Rates
+    RatesResponse:
+      type: object
+      properties:
+        base:
+          type: string
+          example: USD
+        rates:
+          type: object
+          properties:
+            USD:
+              type: number
+              example: 1
+            COP:
+              type: number
+              example: 4150.50
+            EUR:
+              type: number
+              example: 0.92
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2025-06-01T15:00:00Z"
+
+    # Wallet
+    CurrencyCode:
+      type: string
+      enum: [COP, USD, EUR]
+      example: COP
+
+    Balance:
+      type: object
+      properties:
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        name:
+          type: string
+          example: Peso colombiano
+        symbol:
+          type: string
+          example: $
+        amount:
+          type: number
+          format: double
+          example: 250000.00
+        estimatedCOP:
+          type: number
+          format: double
+          example: 250000.00
+
+    WalletResponse:
+      type: object
+      properties:
+        walletId:
+          type: integer
+          example: 3
+        balances:
+          type: array
+          items:
+            $ref: "#/components/schemas/Balance"
+        totalEstimatedCOP:
+          type: number
+          format: double
+          example: 315400.00
+
+    AmountCurrencyRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 50000
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+
+    DepositResponse:
+      type: object
+      properties:
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        deposited:
+          type: number
+          example: 50000
+        newBalance:
+          type: number
+          example: 300000
+
+    WithdrawResponse:
+      type: object
+      properties:
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        withdrawn:
+          type: number
+          example: 20000
+        newBalance:
+          type: number
+          example: 280000
+
+    ExchangeRequest:
+      type: object
+      required: [from, to, amount]
+      properties:
+        from:
+          $ref: "#/components/schemas/CurrencyCode"
+        to:
+          $ref: "#/components/schemas/CurrencyCode"
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 100
+
+    ExchangeResponse:
+      type: object
+      properties:
+        from:
+          type: object
+          properties:
+            currency:
+              $ref: "#/components/schemas/CurrencyCode"
+            debited:
+              type: number
+              example: 100
+        to:
+          type: object
+          properties:
+            currency:
+              $ref: "#/components/schemas/CurrencyCode"
+            credited:
+              type: number
+              example: 415050
+        appliedRate:
+          type: number
+          example: 4150.50
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 18
+        type:
+          type: string
+          enum: [deposit, withdrawal, exchange]
+          example: exchange
+        amount:
+          type: number
+          example: 100
+        currency:
+          type: string
+          example: USD
+        currencySymbol:
+          type: string
+          example: $
+        targetCurrency:
+          type: string
+          nullable: true
+          example: COP
+        targetCurrencySymbol:
+          type: string
+          nullable: true
+          example: $
+        exchangeRate:
+          type: number
+          nullable: true
+          example: 4150.50
+        description:
+          type: string
+          example: Exchange 100 USD → 415050 COP
+        createdAt:
+          type: string
+          format: date-time
+
+    TransactionsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    # Goals
+    Goal:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        name:
+          type: string
+          example: Viaje a Europa
+        currency:
+          type: string
+          example: USD
+        currencySymbol:
+          type: string
+          example: $
+        targetAmount:
+          type: number
+          example: 3000
+        currentAmount:
+          type: number
+          example: 750
+        progress:
+          type: number
+          description: Percentage 0–100
+          example: 25.00
+        targetDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-07-01"
+        status:
+          type: string
+          enum: [active, completed, cancelled]
+          example: active
+        createdAt:
+          type: string
+          format: date-time
+
+    GoalsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Goal"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    CreateGoalRequest:
+      type: object
+      required: [name, targetAmount]
+      properties:
+        name:
+          type: string
+          example: Viaje a Europa
+        targetAmount:
+          type: number
+          minimum: 0.01
+          example: 3000
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        targetDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-07-01"
+
+    ContributeWithdrawRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 250
+
+    GoalActionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        name:
+          type: string
+          example: Viaje a Europa
+        targetAmount:
+          type: number
+          example: 3000
+        currentAmount:
+          type: number
+          example: 1000
+        progress:
+          type: number
+          example: 33.33
+        status:
+          type: string
+          example: active
+        completed:
+          type: boolean
+          example: false
+
+  # Reusable parameters
+  parameters:
+    PageParam:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number
+    LimitParam:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+      description: Items per page
+    GoalId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+      description: Savings goal ID
+
+  # Reusable responses
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Token requerido
+            status: 401
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Demasiadas peticiones, intenta de nuevo en 15 minutos
+            status: 429
+
+# Paths
+paths:
+
+  # Auth 
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: |
+        Creates a user account, a wallet, and zero-balance entries for every
+        supported currency (COP, USD, EUR). Rate-limited to **10 requests / 15 min**.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: El email ya está en uso
+                status: 409
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in and receive a JWT
+      description: |
+        Validates credentials and returns a **JWT valid for 24 hours**.
+        Rate-limited to **10 requests / 15 min**.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  # Rates
+  /rates:
+    get:
+      tags: [Rates]
+      summary: Get current exchange rates
+      description: |
+        Returns live USD-based rates for COP and EUR. Results are cached
+        server-side for **1 hour** to avoid hitting the external API on every request.
+        No authentication required.
+      responses:
+        "200":
+          description: Exchange rates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatesResponse"
+
+  # Wallet
+  /wallet:
+    get:
+      tags: [Wallet]
+      summary: Get wallet balances
+      description: |
+        Returns all currency balances plus a **total estimated in COP**
+        using live exchange rates.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Wallet data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /wallet/deposit:
+    post:
+      tags: [Wallet]
+      summary: Deposit funds
+      description: |
+        Adds funds to the specified currency balance and records a `deposit` transaction.
+        `amount` must be a positive number with at most 2 decimal places.
+        Defaults to **COP** if `currency` is omitted.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AmountCurrencyRequest"
+            example:
+              amount: 50000
+              currency: COP
+      responses:
+        "200":
+          description: Deposit successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepositResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /wallet/withdraw:
+    post:
+      tags: [Wallet]
+      summary: Withdraw funds
+      description: |
+        Deducts funds from the specified currency balance and records a `withdrawal`
+        transaction. Returns **400** if the balance is insufficient.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AmountCurrencyRequest"
+            example:
+              amount: 20000
+              currency: COP
+      responses:
+        "200":
+          description: Withdrawal successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /wallet/exchange:
+    post:
+      tags: [Wallet]
+      summary: Exchange between currencies
+      description: |
+        Converts `amount` of `from` currency into `to` currency at the live rate.
+        Records the transaction and a **double-entry ledger** (debit + credit).
+        Rate-limited to **10 requests / min** per IP.
+        `from` and `to` must be different.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExchangeRequest"
+            example:
+              from: USD
+              to: COP
+              amount: 100
+      responses:
+        "200":
+          description: Exchange successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangeResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /wallet/transactions:
+    get:
+      tags: [Wallet]
+      summary: List transaction history
+      description: |
+        Returns a paginated list of all transactions (deposits, withdrawals, exchanges)
+        for the authenticated user's wallet, ordered newest-first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # Goals 
+  /goals:
+    get:
+      tags: [Goals]
+      summary: List savings goals
+      description: Returns all savings goals for the authenticated user's wallet, newest-first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Goals list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags: [Goals]
+      summary: Create a savings goal
+      description: |
+        Creates a new savings goal linked to the user's wallet.
+        `targetDate` is optional. Defaults to **COP** if `currency` is omitted.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGoalRequest"
+      responses:
+        "201":
+          description: Goal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /goals/{id}/contribute:
+    post:
+      tags: [Goals]
+      summary: Contribute to a goal
+      description: |
+        Transfers `amount` from the wallet balance (in the goal's currency) into the goal.
+        Automatically marks the goal as **completed** when `currentAmount >= targetAmount`.
+        Returns **400** if balance is insufficient or the amount exceeds what's still needed.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GoalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContributeWithdrawRequest"
+      responses:
+        "200":
+          description: Contribution successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalActionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /goals/{id}/withdraw:
+    post:
+      tags: [Goals]
+      summary: Withdraw from a goal
+      description: |
+        Refunds `amount` back to the wallet balance from the goal's savings.
+        Cannot exceed `currentAmount`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GoalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContributeWithdrawRequest"
+      responses:
+        "200":
+          description: Withdrawal from goal successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/GoalActionResponse"
+                  - type: object
+                    properties:
+                      withdrawn:
+                        type: number
+                        example: 250
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /goals/{id}:
+    delete:
+      tags: [Goals]
+      summary: Delete a savings goal
+      description: |
+        Permanently deletes the goal and **refunds any saved amount** back to the wallet balance.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GoalId"
+      responses:
+        "200":
+          description: Goal deleted and balance refunded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Meta eliminada, 750 devueltos a tu balance
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"

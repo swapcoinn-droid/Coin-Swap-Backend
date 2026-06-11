@@ -19,6 +19,8 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "jsonwebtoken": "^9.0.3",
-    "pg": "^8.21.0"
+    "pg": "^8.21.0",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.9.0"
   }
 }
