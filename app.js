@@ -3,6 +3,7 @@ import cors from "cors";
 import authRouter from './routes/auth.routes.js';
 import ratesRouter from "./routes/rates.routes.js";
 import walletRouter from "./routes/wallet.routes.js";
+import goalsRouter from "./routes/goals.routes.js";
 import { errorHandler } from "./error/errorHandler.js";
 
 const app = express();
@@ -23,6 +24,7 @@ app.use(cors({
 
 app.use("/api/auth", authRouter);
 app.use("/api/wallet", walletRouter);
+app.use("/api/goals", goalsRouter);
 app.use(errorHandler);
 
 export default app;
