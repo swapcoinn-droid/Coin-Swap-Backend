@@ -1,5 +1,5 @@
 import express from "express";
-import { getGoals, createGoal, contributeToGoal } from "../services/goalsService.js";
+import { getGoals, createGoal, contributeToGoal, withdrawFromGoal, deleteGoal } from "../services/goalsService.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { badRequest } from "../error/errorHandler.js";
 
@@ -32,6 +32,22 @@ goalsRouter.post("/:id/contribute", requireAuth, asyncHandler(async (req, res, n
     if (!amount || amount <= 0) return next(badRequest("Monto inválido"));
     if (isNaN(goalId)) return next(badRequest("ID de meta inválido"));
     const result = await contributeToGoal({ userId: req.user.id, goalId, amount });
+    res.status(200).json(result);
+}));
+
+goalsRouter.post("/:id/withdraw", requireAuth, asyncHandler(async (req, res, next) => {
+    const { amount } = req.body;
+    const goalId = parseInt(req.params.id);
+    if (!amount || amount <= 0) return next(badRequest("Monto inválido"));
+    if (isNaN(goalId)) return next(badRequest("ID de meta inválido"));
+    const result = await withdrawFromGoal({ userId: req.user.id, goalId, amount });
+    res.status(200).json(result);
+}));
+
+goalsRouter.delete("/:id", requireAuth, asyncHandler(async (req, res, next) => {
+    const goalId = parseInt(req.params.id);
+    if (isNaN(goalId)) return next(badRequest("ID de meta inválido"));
+    const result = await deleteGoal({ userId: req.user.id, goalId });
     res.status(200).json(result);
 }));
 

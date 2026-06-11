@@ -152,3 +152,110 @@ export async function contributeToGoal({ userId, goalId, amount }) {
         client.release();
     }
 }
+
+export async function withdrawFromGoal({ userId, goalId, amount }) {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        const walletResult = await client.query(
+            `SELECT id FROM wallet WHERE user_id = $1`,
+            [userId]
+        );
+        if (!walletResult.rows[0]) throw notFound("Wallet no encontrada");
+        const walletId = walletResult.rows[0].id;
+
+        // Obtener la meta y verificar que pertenezca a esta wallet
+        const goalResult = await client.query(
+            `SELECT * FROM savings_goal WHERE id = $1 AND wallet_id = $2`,
+            [goalId, walletId]
+        );
+        if (!goalResult.rows[0]) throw notFound("Meta no encontrada");
+        const goal = goalResult.rows[0];
+
+        // No se puede retirar más de lo que se ha ahorrado
+        if (amount > Number(goal.current_amount)) {
+            throw badRequest(`No puedes retirar más de ${Number(goal.current_amount)} de esta meta`);
+        }
+
+        // Reembolsar al balance
+        await client.query(
+            `UPDATE balance SET amount = amount + $1
+             WHERE wallet_id = $2 AND currency_id = $3`,
+            [amount, walletId, goal.currency_id]
+        );
+
+        // Restar de la meta
+        const updatedGoal = await client.query(
+            `UPDATE savings_goal
+             SET current_amount = current_amount - $1
+             WHERE id = $2
+             RETURNING *`,
+            [amount, goalId]
+        );
+        const row = updatedGoal.rows[0];
+
+        await client.query("COMMIT");
+        return {
+            id: row.id,
+            name: row.name,
+            targetAmount: Number(row.target_amount),
+            currentAmount: Number(row.current_amount),
+            progress: +((Number(row.current_amount) / Number(row.target_amount)) * 100).toFixed(2),
+            status: row.status,
+            withdrawn: amount
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+export async function deleteGoal({ userId, goalId }) {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        const walletResult = await client.query(
+            `SELECT id FROM wallet WHERE user_id = $1`,
+            [userId]
+        );
+        if (!walletResult.rows[0]) throw notFound("Wallet no encontrada");
+        const walletId = walletResult.rows[0].id;
+
+        // Obtener la meta y verificar que pertenezca a esta wallet
+        const goalResult = await client.query(
+            `SELECT * FROM savings_goal WHERE id = $1 AND wallet_id = $2`,
+            [goalId, walletId]
+        );
+        if (!goalResult.rows[0]) throw notFound("Meta no encontrada");
+        const goal = goalResult.rows[0];
+
+        // Devolver el monto actual a la billetera si hay algo ahorrado
+        if (Number(goal.current_amount) > 0) {
+            await client.query(
+                `UPDATE balance SET amount = amount + $1
+                 WHERE wallet_id = $2 AND currency_id = $3`,
+                [goal.current_amount, walletId, goal.currency_id]
+            );
+        }
+
+        // Borrar la meta
+        await client.query(
+            `DELETE FROM savings_goal WHERE id = $1`,
+            [goalId]
+        );
+
+        await client.query("COMMIT");
+        return {
+            message: `Meta eliminada, ${Number(goal.current_amount)} devueltos a tu balance`
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
