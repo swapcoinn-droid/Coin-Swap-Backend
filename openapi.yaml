@@ -11,7 +11,7 @@ info:
 servers:
   - url: http://localhost:3000/api
     description: Local development server
-  - url: https://swap-coin-backend.railway.app/api
+  - url: https://coin-swap-backend-production.up.railway.app
     description: Production (Railway)
 
 tags:
