@@ -1,5 +1,7 @@
 import pool from "../db/config.js";
 import { getRates, convert } from "./exchangeRateService.js";
+import { findById } from "./usersService.js";
+import { sendDepositEmail, sendWithdrawEmail, sendExchangeEmail } from "./emailService.js";
 import { notFound, badRequest } from "../error/errorHandler.js";
 
 export async function getWallet(userId) {
@@ -82,10 +84,21 @@ export async function deposit({ userId, amount, currencyCode = "COP" }) {
         );
 
         await client.query("COMMIT");
+
+        // Email de confirmación de depósito
+        const user = await findById(userId);
+        sendDepositEmail({
+            to: user.email,
+            name: user.name,
+            amount,
+            currency: currencyCode,
+            newBalance: Number(balanceResult.rows[0].amount),
+        });
         return {
             currency: currencyCode,
             deposited: amount,
-            newBalance: Number(balanceResult.rows[0].amount)
+            newBalance: Number(balanceResult.rows[0].amount),
+            notification: emailResult?.ok ? "sent" : "failed"
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -143,10 +156,21 @@ export async function withdraw({ userId, amount, currencyCode = "COP" }) {
         );
 
         await client.query("COMMIT");
+
+        // Email de confirmación de retiro
+        const user = await findById(userId);
+        sendWithdrawEmail({
+            to: user.email,
+            name: user.name,
+            amount,
+            currency: currencyCode,
+            newBalance: Number(balanceResult.rows[0].amount),
+        });
         return {
             currency: currencyCode,
             withdrawn: amount,
-            newBalance: Number(balanceResult.rows[0].amount)
+            newBalance: Number(balanceResult.rows[0].amount),
+            notification: emailResult?.ok ? "sent" : "failed"
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -237,10 +261,23 @@ export async function exchange({ userId, fromCode, toCode, amount }) {
         );
 
         await client.query("COMMIT");
+
+        // Email de confirmación de intercambio de divisas
+        const user = await findById(userId);
+        sendExchangeEmail({
+            to: user.email,
+            name: user.name,
+            fromAmount: amount,
+            fromCurrency: fromCode,
+            toAmount: receivedAmount,
+            toCurrency: toCode,
+            appliedRate,
+        });
         return {
             from: { currency: fromCode, debited: amount },
             to: { currency: toCode, credited: receivedAmount },
-            appliedRate
+            appliedRate,
+            notification: emailResult?.ok ? "sent" : "failed"
         };
     } catch (error) {
         await client.query("ROLLBACK");
