@@ -87,7 +87,7 @@ export async function deposit({ userId, amount, currencyCode = "COP" }) {
 
         // Email de confirmación de depósito
         const user = await findById(userId);
-        sendDepositEmail({
+        const emailResult = await sendDepositEmail({
             to: user.email,
             name: user.name,
             amount,
@@ -98,7 +98,7 @@ export async function deposit({ userId, amount, currencyCode = "COP" }) {
             currency: currencyCode,
             deposited: amount,
             newBalance: Number(balanceResult.rows[0].amount),
-            notification: emailResult?.ok ? "sent" : "failed"
+            notification: emailResult?.ok ? "Enviado" : "Error al enviar"
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -159,7 +159,7 @@ export async function withdraw({ userId, amount, currencyCode = "COP" }) {
 
         // Email de confirmación de retiro
         const user = await findById(userId);
-        sendWithdrawEmail({
+        const emailResult = await sendWithdrawEmail({
             to: user.email,
             name: user.name,
             amount,
@@ -170,7 +170,7 @@ export async function withdraw({ userId, amount, currencyCode = "COP" }) {
             currency: currencyCode,
             withdrawn: amount,
             newBalance: Number(balanceResult.rows[0].amount),
-            notification: emailResult?.ok ? "sent" : "failed"
+            notification: emailResult?.ok ? "Enviado" : "Error al enviar"
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -264,7 +264,7 @@ export async function exchange({ userId, fromCode, toCode, amount }) {
 
         // Email de confirmación de intercambio de divisas
         const user = await findById(userId);
-        sendExchangeEmail({
+        const emailResult = await sendExchangeEmail({
             to: user.email,
             name: user.name,
             fromAmount: amount,
@@ -277,7 +277,7 @@ export async function exchange({ userId, fromCode, toCode, amount }) {
             from: { currency: fromCode, debited: amount },
             to: { currency: toCode, credited: receivedAmount },
             appliedRate,
-            notification: emailResult?.ok ? "sent" : "failed"
+            notification: emailResult?.ok ? "Enviado" : "Error al enviar"
         };
     } catch (error) {
         await client.query("ROLLBACK");
