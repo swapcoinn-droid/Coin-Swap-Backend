@@ -1,5 +1,5 @@
 import express from "express";
-import { getGoals, createGoal, contributeToGoal, withdrawFromGoal, deleteGoal } from "../services/goalsService.js";
+import { getGoals, createGoal, contributeToGoal, withdrawFromGoal, updateGoal, deleteGoal } from "../services/goalsService.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { sanitizeAmount, sanitizePagination } from "../middleware/validate.middleware.js";
 import { badRequest } from "../error/errorHandler.js";
@@ -43,6 +43,15 @@ goalsRouter.post("/:id/withdraw", requireAuth, sanitizeAmount, asyncHandler(asyn
     if (!amount || amount <= 0) return next(badRequest("Monto inválido"));
     if (isNaN(goalId)) return next(badRequest("ID de meta inválido"));
     const result = await withdrawFromGoal({ userId: req.user.id, goalId, amount });
+    res.status(200).json(result);
+}));
+
+goalsRouter.patch("/:id", requireAuth, asyncHandler(async (req, res, next) => {
+    const { name, targetAmount, targetDate } = req.body;
+    const goalId = parseInt(req.params.id);
+    if (isNaN(goalId)) return next(badRequest("ID de meta inválido"));
+    if (!name && !targetAmount && !targetDate) return next(badRequest("Debes enviar al menos un campo para actualizar"));
+    const result = await updateGoal({ userId: req.user.id, goalId, name, targetAmount, targetDate });
     res.status(200).json(result);
 }));
 

@@ -232,6 +232,54 @@ export async function withdrawFromGoal({ userId, goalId, amount }) {
     }
 }
 
+export async function updateGoal({ userId, goalId, name, targetAmount, targetDate }) {
+    const walletResult = await pool.query(
+        `SELECT id FROM wallet WHERE user_id = $1`,
+        [userId]
+    );
+    if (!walletResult.rows[0]) throw notFound("Wallet no encontrada");
+    const walletId = walletResult.rows[0].id;
+
+    const goalResult = await pool.query(
+        `SELECT * FROM savings_goal WHERE id = $1 AND wallet_id = $2`,
+        [goalId, walletId]
+    );
+    if (!goalResult.rows[0]) throw notFound("Meta no encontrada");
+    const goal = goalResult.rows[0];
+
+    if (goal.status !== "active") throw badRequest("No puedes editar una meta que no está activa");
+
+    // Solo actualiza campos que fueron enviados
+    const updatedName        = name         ?? goal.name;
+    const updatedTargetAmount = targetAmount ?? goal.target_amount;
+    const updatedTargetDate  = targetDate    ?? goal.target_date;
+
+    // El nuevo monto objetivo no puede ser menor al monto ya ahorrado
+    if (Number(updatedTargetAmount) < Number(goal.current_amount)) {
+        throw badRequest(`El nuevo monto objetivo no puede ser menor al monto ya ahorrado (${Number(goal.current_amount)})`);
+    }
+
+    const result = await pool.query(
+        `UPDATE savings_goal
+         SET name = $1, target_amount = $2, target_date = $3
+         WHERE id = $4
+         RETURNING *`,
+        [updatedName, updatedTargetAmount, updatedTargetDate, goalId]
+    );
+    const row = result.rows[0];
+
+    return {
+        id: row.id,
+        name: row.name,
+        targetAmount: Number(row.target_amount),
+        currentAmount: Number(row.current_amount),
+        progress: +((Number(row.current_amount) / Number(row.target_amount)) * 100).toFixed(2),
+        targetDate: row.target_date,
+        status: row.status,
+        createdAt: row.created_at
+    };
+}
+
 export async function deleteGoal({ userId, goalId }) {
     const client = await pool.connect();
     try {
