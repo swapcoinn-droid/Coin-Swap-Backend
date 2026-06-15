@@ -87,6 +87,7 @@ export async function deposit({ userId, amount, currencyCode = "COP" }) {
 
         // Email de confirmación de depósito
         const user = await findById(userId);
+        console.log("[DEBUG] Sending email to:", user?.email, "| User found:", !!user);
         const emailResult = await sendDepositEmail({
             to: user.email,
             name: user.name,
@@ -94,6 +95,7 @@ export async function deposit({ userId, amount, currencyCode = "COP" }) {
             currency: currencyCode,
             newBalance: Number(balanceResult.rows[0].amount),
         });
+        console.log("[DEBUG] Email result:", emailResult);
         return {
             currency: currencyCode,
             deposited: amount,
@@ -159,6 +161,7 @@ export async function withdraw({ userId, amount, currencyCode = "COP" }) {
 
         // Email de confirmación de retiro
         const user = await findById(userId);
+        console.log("[DEBUG] Sending email to:", user?.email, "| User found:", !!user);
         const emailResult = await sendWithdrawEmail({
             to: user.email,
             name: user.name,
@@ -166,6 +169,7 @@ export async function withdraw({ userId, amount, currencyCode = "COP" }) {
             currency: currencyCode,
             newBalance: Number(balanceResult.rows[0].amount),
         });
+        console.log("[DEBUG] Email result:", emailResult);
         return {
             currency: currencyCode,
             withdrawn: amount,
@@ -264,6 +268,7 @@ export async function exchange({ userId, fromCode, toCode, amount }) {
 
         // Email de confirmación de intercambio de divisas
         const user = await findById(userId);
+        console.log("[DEBUG] Sending email to:", user?.email, "| User found:", !!user);
         const emailResult = await sendExchangeEmail({
             to: user.email,
             name: user.name,
@@ -273,6 +278,7 @@ export async function exchange({ userId, fromCode, toCode, amount }) {
             toCurrency: toCode,
             appliedRate,
         });
+        console.log("[DEBUG] Email result:", emailResult);
         return {
             from: { currency: fromCode, debited: amount },
             to: { currency: toCode, credited: receivedAmount },
