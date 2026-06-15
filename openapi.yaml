@@ -10,9 +10,9 @@ info:
 
 servers:
   - url: http://localhost:3000/api
-    description: Local development server
+    description: Server de desarrollo local
   - url: https://coin-swap-backend-production.up.railway.app/api
-    description: Production (Railway)
+    description: Server de producción (Railway)
 
 tags:
   - name: Auth
@@ -24,7 +24,7 @@ tags:
   - name: Goals
     description: Gestión de metas de ahorro
 
-# Reusable components 
+# Reusable components
 components:
   securitySchemes:
     bearerAuth:
@@ -33,7 +33,7 @@ components:
       bearerFormat: JWT
 
   schemas:
-    # Generic 
+    # Generic
     Error:
       type: object
       properties:
@@ -386,6 +386,24 @@ components:
           nullable: true
           example: "2026-07-01"
 
+    UpdateGoalRequest:
+  type: object
+  description: Todos los campos son opcionales; envía solo los que desees cambiar.
+  properties:
+    name:
+      type: string
+      example: Viaje a Japón
+    targetAmount:
+      type: number
+      minimum: 0.01
+      example: 4000
+      description: No puede ser menor al monto ya ahorrado.
+    targetDate:
+      type: string
+      format: date
+      nullable: true
+      example: "2027-03-15"
+
     ContributeWithdrawRequest:
       type: object
       required: [amount]
@@ -430,7 +448,7 @@ components:
         type: integer
         minimum: 1
         default: 1
-      description: Page number
+      description: Número de página
     LimitParam:
       in: query
       name: limit
@@ -439,19 +457,19 @@ components:
         minimum: 1
         maximum: 100
         default: 10
-      description: Items per page
+      description: Número de items por página
     GoalId:
       in: path
       name: id
       required: true
       schema:
         type: integer
-      description: Savings goal ID
+      description: ID de la meta
 
   # Reusable responses
   responses:
     Unauthorized:
-      description: Missing or invalid JWT token
+      description: Falta de token o JWT inválido
       content:
         application/json:
           schema:
@@ -460,19 +478,19 @@ components:
             error: Token requerido
             status: 401
     BadRequest:
-      description: Validation error
+      description: Error de validación
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
     NotFound:
-      description: Resource not found
+      description: Recurso no encontrado
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
     TooManyRequests:
-      description: Rate limit exceeded
+      description: Límite de peticiones excedido
       content:
         application/json:
           schema:
@@ -488,10 +506,10 @@ paths:
   /auth/register:
     post:
       tags: [Auth]
-      summary: Register a new user
+      summary: Registro de un nuevo usuario
       description: |
-        Creates a user account, a wallet, and zero-balance entries for every
-        supported currency (COP, USD, EUR). Rate-limited to **10 requests / 15 min**.
+        Crea una cuenta de usuario, una billetera y entradas de saldo cero para cada moneda admitida (COP, USD, EUR). 
+        Tasa limitada a **10 solicitudes / 15 min**.
       requestBody:
         required: true
         content:
@@ -500,7 +518,7 @@ paths:
               $ref: "#/components/schemas/RegisterRequest"
       responses:
         "201":
-          description: User created
+          description: Usuario creado
           content:
             application/json:
               schema:
@@ -508,7 +526,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
         "409":
-          description: Email already in use
+          description: Email ya tiene una cuenta asociada
           content:
             application/json:
               schema:
@@ -522,10 +540,10 @@ paths:
   /auth/login:
     post:
       tags: [Auth]
-      summary: Log in and receive a JWT
+      summary: Autenticación y recibo de JWT
       description: |
-        Validates credentials and returns a **JWT valid for 24 hours**.
-        Rate-limited to **10 requests / 15 min**.
+        Valida las credenciales y retorna un **JWT válido por 24 horas**.
+        Tasa limitada a **10 solicitudes / 15 min**.
       requestBody:
         required: true
         content:
@@ -534,7 +552,7 @@ paths:
               $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
-          description: Successful login
+          description: Login exitoso
           content:
             application/json:
               schema:
@@ -542,7 +560,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
-          description: Invalid credentials
+          description: Credenciales inválidas
           content:
             application/json:
               schema:
@@ -554,14 +572,14 @@ paths:
   /rates:
     get:
       tags: [Rates]
-      summary: Get current exchange rates
+      summary: Obtiene las tasas de cambio actuales
       description: |
-        Returns live USD-based rates for COP and EUR. Results are cached
-        server-side for **1 hour** to avoid hitting the external API on every request.
-        No authentication required.
+        Retorna las tasas de cambio actuales para COP y EUR basadas en USD. Los resultados se almacenan en caché
+        por **1 hora** para evitar chocar con la API externa en cada solicitud.
+        No requiere autenticación.
       responses:
         "200":
-          description: Exchange rates
+          description: Tasas de cambio
           content:
             application/json:
               schema:
@@ -571,15 +589,15 @@ paths:
   /wallet:
     get:
       tags: [Wallet]
-      summary: Get wallet balances
+      summary: Obtiene los saldos de la billetera
       description: |
-        Returns all currency balances plus a **total estimated in COP**
-        using live exchange rates.
+        Retorna todos los saldos de las monedas más un **total estimado en COP**
+        usando las tasas de cambio actuales.
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Wallet data
+          description: Datos de la billetera
           content:
             application/json:
               schema:
@@ -592,11 +610,10 @@ paths:
   /wallet/deposit:
     post:
       tags: [Wallet]
-      summary: Deposit funds
+      summary: Deposito de fondos
       description: |
-        Adds funds to the specified currency balance and records a `deposit` transaction.
-        `amount` must be a positive number with at most 2 decimal places.
-        Defaults to **COP** if `currency` is omitted.
+        Agrega fondos a la billetera del usuario. El depósito debe ser mayor a 0 y tener máximo 2 decimales.
+        Por defecto, se asume **COP** si no se especifica una moneda.
       security:
         - bearerAuth: []
       requestBody:
@@ -610,7 +627,7 @@ paths:
               currency: COP
       responses:
         "200":
-          description: Deposit successful
+          description: Deposito exitoso
           content:
             application/json:
               schema:
@@ -623,10 +640,10 @@ paths:
   /wallet/withdraw:
     post:
       tags: [Wallet]
-      summary: Withdraw funds
+      summary: Retira fondos
       description: |
-        Deducts funds from the specified currency balance and records a `withdrawal`
-        transaction. Returns **400** if the balance is insufficient.
+        Retira fondos de la billetera del usuario. El retiro debe ser menor o igual al saldo disponible.
+        Retorna **400** si el saldo es insuficiente.
       security:
         - bearerAuth: []
       requestBody:
@@ -640,7 +657,7 @@ paths:
               currency: COP
       responses:
         "200":
-          description: Withdrawal successful
+          description: Retiro exitoso
           content:
             application/json:
               schema:
@@ -653,12 +670,12 @@ paths:
   /wallet/exchange:
     post:
       tags: [Wallet]
-      summary: Exchange between currencies
+      summary: Intercambia entre monedas
       description: |
-        Converts `amount` of `from` currency into `to` currency at the live rate.
-        Records the transaction and a **double-entry ledger** (debit + credit).
-        Rate-limited to **10 requests / min** per IP.
-        `from` and `to` must be different.
+        Convierte `amount` de la moneda `from` a la moneda `to` a la tasa actual.
+        Registra la transacción y un **double-entry ledger** (débito + crédito).
+        Tasa limitada a **10 solicitudes / min** por IP.
+        `from` y `to` deben ser diferentes.
       security:
         - bearerAuth: []
       requestBody:
@@ -673,7 +690,7 @@ paths:
               amount: 100
       responses:
         "200":
-          description: Exchange successful
+          description: Intercambio exitoso
           content:
             application/json:
               schema:
@@ -688,10 +705,10 @@ paths:
   /wallet/transactions:
     get:
       tags: [Wallet]
-      summary: List transaction history
+      summary: Lista el historial de transacciones
       description: |
-        Returns a paginated list of all transactions (deposits, withdrawals, exchanges)
-        for the authenticated user's wallet, ordered newest-first.
+        Retorna una lista paginada de todas las transacciones (depósitos, retiros, intercambios y metas)
+        de la billetera del usuario autenticado, ordenadas de la más reciente a la más antigua.
       security:
         - bearerAuth: []
       parameters:
@@ -699,7 +716,7 @@ paths:
         - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
-          description: Transaction list
+          description: Lista de transacciones
           content:
             application/json:
               schema:
@@ -713,8 +730,8 @@ paths:
   /goals:
     get:
       tags: [Goals]
-      summary: List savings goals
-      description: Returns all savings goals for the authenticated user's wallet, newest-first.
+      summary: Lista las metas de ahorro
+      description: Retorna una lista paginada de todas las metas de ahorro del usuario autenticado, ordenadas de la más reciente a la más antigua.
       security:
         - bearerAuth: []
       parameters:
@@ -722,7 +739,7 @@ paths:
         - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
-          description: Goals list
+          description: Lista de metas de ahorro
           content:
             application/json:
               schema:
@@ -732,10 +749,10 @@ paths:
 
     post:
       tags: [Goals]
-      summary: Create a savings goal
+      summary: Crea una nueva meta de ahorro
       description: |
-        Creates a new savings goal linked to the user's wallet.
-        `targetDate` is optional. Defaults to **COP** if `currency` is omitted.
+        Crea una nueva meta de ahorro asociada a la billetera del usuario autenticado.
+        `targetDate` es opcional. Por defecto se usa **COP** si no se especifica `currency`.
       security:
         - bearerAuth: []
       requestBody:
@@ -746,7 +763,7 @@ paths:
               $ref: "#/components/schemas/CreateGoalRequest"
       responses:
         "201":
-          description: Goal created
+          description: Meta de ahorro creada exitosamente
           content:
             application/json:
               schema:
@@ -759,11 +776,11 @@ paths:
   /goals/{id}/contribute:
     post:
       tags: [Goals]
-      summary: Contribute to a goal
+      summary: Contribuye a una meta de ahorro
       description: |
-        Transfers `amount` from the wallet balance (in the goal's currency) into the goal.
-        Automatically marks the goal as **completed** when `currentAmount >= targetAmount`.
-        Returns **400** if balance is insufficient or the amount exceeds what's still needed.
+        Transfiere `amount` desde el saldo de la billetera (en la misma moneda de la meta) hacia la meta.
+        Marca automáticamente la meta como **completada** cuando `currentAmount >= targetAmount`.
+        Retorna **400** si el saldo es insuficiente o si el monto excede lo que falta para completar la meta.
       security:
         - bearerAuth: []
       parameters:
@@ -776,7 +793,7 @@ paths:
               $ref: "#/components/schemas/ContributeWithdrawRequest"
       responses:
         "200":
-          description: Contribution successful
+          description: Contribución exitosa
           content:
             application/json:
               schema:
@@ -791,10 +808,10 @@ paths:
   /goals/{id}/withdraw:
     post:
       tags: [Goals]
-      summary: Withdraw from a goal
+      summary: Retira fondos de una meta de ahorro
       description: |
-        Refunds `amount` back to the wallet balance from the goal's savings.
-        Cannot exceed `currentAmount`.
+        Retorna una cantidad `amount` desde la meta hacia el saldo de la billetera (en la misma moneda de la meta).
+        No puede exceder el `currentAmount` actual de la meta.
       security:
         - bearerAuth: []
       parameters:
@@ -807,7 +824,7 @@ paths:
               $ref: "#/components/schemas/ContributeWithdrawRequest"
       responses:
         "200":
-          description: Withdrawal from goal successful
+          description: Retiro exitoso de la meta de ahorro
           content:
             application/json:
               schema:
@@ -826,18 +843,49 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   /goals/{id}:
+    patch:
+      tags: [Goals]
+      summary: Actualiza una meta de ahorro
+      description: |
+        Actualiza parcialmente una meta de ahorro activa. Todos los campos del cuerpo de la solicitud son opcionales —
+        envía solo los que deseas cambiar. Se requiere al menos un campo.
+        El `targetAmount` no puede establecerse por debajo del monto ya ahorrado (`currentAmount`).
+        Las metas completadas o canceladas no se pueden editar.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GoalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGoalRequest"
+      responses:
+        "200":
+          description: Meta de ahorro actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
     delete:
       tags: [Goals]
-      summary: Delete a savings goal
+      summary: Elimina una meta de ahorro
       description: |
-        Permanently deletes the goal and **refunds any saved amount** back to the wallet balance.
+        Elimina permanentemente la meta y devuelve cualquier monto ahorrado a la billetera.
       security:
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/GoalId"
       responses:
         "200":
-          description: Goal deleted and balance refunded
+          description: Meta eliminada y saldo devuelto
           content:
             application/json:
               schema:
