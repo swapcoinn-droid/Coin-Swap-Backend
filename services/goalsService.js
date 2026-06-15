@@ -154,6 +154,14 @@ export async function contributeToGoal({ userId, goalId, amount }) {
         );
         const row = updatedGoal.rows[0];
 
+        // Insertar el registro de transacción cuando se agrega dinero a la meta
+        await client.query(
+            `INSERT INTO transaction
+             (type, amount, currency_id, source_wallet_id, description)
+             VALUES ('deposit', $1, $2, $3, $4)`,
+            [amount, goal.currency_id, walletId, `Aporte a meta: ${goal.name}`]
+        );
+
         await client.query("COMMIT");
         return {
             id: row.id,
@@ -213,6 +221,14 @@ export async function withdrawFromGoal({ userId, goalId, amount }) {
             [amount, goalId]
         );
         const row = updatedGoal.rows[0];
+
+        // Insertar el registro de transacción cuando se retira dinero de la meta
+        await client.query(
+            `INSERT INTO transaction
+             (type, amount, currency_id, source_wallet_id, description)
+             VALUES ('withdrawal', $1, $2, $3, $4)`,
+            [amount, goal.currency_id, walletId, `Retiro de meta: ${goal.name}`]
+        );
 
         await client.query("COMMIT");
         return {
@@ -306,6 +322,14 @@ export async function deleteGoal({ userId, goalId }) {
                 `UPDATE balance SET amount = amount + $1
                  WHERE wallet_id = $2 AND currency_id = $3`,
                 [goal.current_amount, walletId, goal.currency_id]
+            );
+
+            // Insertar el registro de transacción cuando se elimina la meta
+            await client.query(
+                `INSERT INTO transaction
+                 (type, amount, currency_id, source_wallet_id, description)
+                 VALUES ('withdrawal', $1, $2, $3, $4)`,
+                [goal.current_amount, goal.currency_id, walletId, `Reembolso por eliminación de meta: ${goal.name}`]
             );
         }
 
