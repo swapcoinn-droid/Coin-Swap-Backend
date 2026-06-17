@@ -17,6 +17,8 @@ servers:
 tags:
   - name: Auth
     description: Registro e inicio de sesión de usuarios
+  - name: Chat
+    description: Asistente virtual SwapBot
   - name: Rates
     description: Tasas de cambio en tiempo real
   - name: Wallet
@@ -131,6 +133,43 @@ components:
             email:
               type: string
               example: maria@example.com
+
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          maxLength: 300
+          example: ¿Cómo deposito fondos?
+        history:
+          type: array
+          default: []
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [user, model]
+              text:
+                type: string
+
+    ChatResponse:
+      type: object
+      properties:
+        reply:
+          type: string
+          example: "¡Hola, aventurero! Puedes depositar desde /wallet/deposit."
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [user, model]
+              text:
+                type: string
 
     # Rates
     RatesResponse:
@@ -387,22 +426,22 @@ components:
           example: "2026-07-01"
 
     UpdateGoalRequest:
-  type: object
-  description: Todos los campos son opcionales; envía solo los que desees cambiar.
-  properties:
-    name:
-      type: string
-      example: Viaje a Japón
-    targetAmount:
-      type: number
-      minimum: 0.01
-      example: 4000
-      description: No puede ser menor al monto ya ahorrado.
-    targetDate:
-      type: string
-      format: date
-      nullable: true
-      example: "2027-03-15"
+      type: object
+      description: Todos los campos son opcionales; envía solo los que desees cambiar.
+      properties:
+        name:
+          type: string
+          example: Viaje a Japón
+        targetAmount:
+          type: number
+          minimum: 0.01
+          example: 4000
+          description: No puede ser menor al monto ya ahorrado.
+        targetDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2027-03-15"
 
     ContributeWithdrawRequest:
       type: object
@@ -900,3 +939,42 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  # Chat
+  /chat:
+    post:
+      tags: [Chat]
+      summary: Envía un mensaje al asistente SwapBot
+      description: |
+        Envía un mensaje al asistente virtual de Swap Coin. Opcionalmente puedes
+        incluir el `history` de la conversación para mantener contexto entre turnos.
+        Devuelve la respuesta del asistente y el historial actualizado.
+        Requiere autenticación.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+      responses:
+        "200":
+          description: Respuesta del asistente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          description: Servicio de chat no disponible
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: El servicio de chat no está disponible en este momento
+                status: 503
