@@ -11,6 +11,16 @@ export const unauthorized = (msg) => createError(msg, 401);
 export const forbidden = (msg) => createError(msg, 403);
 export const internalError = (msg = "Error interno del servidor") => createError(msg, 500);
 
+// Error personalizado para Gemini
+export class ServiceError extends Error {
+    constructor(message, statusCode = 503) {
+        super(message);
+        this.name = "ServiceError";
+        this.statusCode = statusCode;
+        this.isOperational = true;
+    }
+}
+
 export function errorHandler(err, req, res, next) {
     let statusCode = err.statusCode || err.status || 500;
     let message = err.message || "Error interno del servidor";

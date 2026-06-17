@@ -6,6 +6,7 @@ import authRouter from './routes/auth.routes.js';
 import ratesRouter from "./routes/rates.routes.js";
 import walletRouter from "./routes/wallet.routes.js";
 import goalsRouter from "./routes/goals.routes.js";
+import chatRouter from "./routes/chat.routes.js";
 import { generalLimiter, authLimiter } from "./middleware/rateLimit.middleware.js";
 import { errorHandler } from "./error/errorHandler.js";
 import { readFileSync } from "node:fs";
@@ -24,7 +25,7 @@ app.use(cors({
         'http://localhost:3000',
         'http://localhost:5173',
     ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -45,6 +46,7 @@ app.use("/api/auth", authLimiter, authRouter);
 app.use("/api/rates", ratesRouter);
 app.use("/api/wallet", walletRouter);
 app.use("/api/goals", goalsRouter);
+app.use("/api/chat", chatRouter);
 
 // Manejo de errores
 app.use(errorHandler);
