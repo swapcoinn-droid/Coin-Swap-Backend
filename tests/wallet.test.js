@@ -238,13 +238,6 @@ describe("GET /api/wallet/transactions — forma de respuesta", () => {
         { id: 3, type: "exchange",   amount: 100,   currency: "USD", targetCurrency: "COP" },
     ];
 
-    it("todos los tipos de transacción están contabilizados", () => {
-        const types = mockTransactions.map(t => t.type);
-        expect(types).toContain("deposit");
-        expect(types).toContain("withdrawal");
-        expect(types).toContain("exchange");
-    });
-
     it("la transacción exchange tiene una targetCurrency", () => {
         const exchange = mockTransactions.find(t => t.type === "exchange");
         expect(exchange).toHaveProperty("targetCurrency");

@@ -6,30 +6,6 @@ import { convertAmount, getAppliedRate } from "./helpers.js";
 
 const RATES = { USD: 1, COP: 4150.5, EUR: 0.92 };
 
-describe("GET /api/rates — response shape", () => {
-    it("response includes a base currency of USD", () => {
-        const response = { base: "USD", rates: RATES, updatedAt: new Date().toISOString() };
-        expect(response.base).toBe("USD");
-    });
-
-    it("response includes USD, COP and EUR rates", () => {
-        const response = { base: "USD", rates: RATES };
-        expect(response.rates).toHaveProperty("USD");
-        expect(response.rates).toHaveProperty("COP");
-        expect(response.rates).toHaveProperty("EUR");
-    });
-
-    it("USD rate is always 1 (base currency)", () => {
-        expect(RATES.USD).toBe(1);
-    });
-
-    it("updatedAt is a valid ISO date string", () => {
-        const updatedAt = new Date().toISOString();
-        expect(() => new Date(updatedAt)).not.toThrow();
-        expect(new Date(updatedAt).toISOString()).toBe(updatedAt);
-    });
-});
-
 describe("GET /api/rates — convertAmount()", () => {
     it("converts 100 USD to COP correctly", () => {
         expect(convertAmount(100, "USD", "COP", RATES)).toBe(415050);

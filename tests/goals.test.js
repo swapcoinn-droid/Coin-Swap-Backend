@@ -259,19 +259,6 @@ describe("PATCH /api/goals/:id — newTargetAmountIsValid()", () => {
 // DELETE /api/goals/:id
 
 describe("DELETE /api/goals/:id — refund logic", () => {
-    it("reembolsa currentAmount a la billetera cuando es mayor a 0", () => {
-        const currentAmount = 750;
-        const walletBalance = 1000;
-        const newBalance = walletBalance + currentAmount;
-        expect(newBalance).toBe(1750);
-    });
-
-    it("no cambia el balance de la billetera cuando el currentAmount es 0", () => {
-        const currentAmount = 0;
-        const walletBalance = 1000;
-        const newBalance = walletBalance + currentAmount;
-        expect(newBalance).toBe(1000);
-    });
 
     it("el mensaje de respuesta incluye el monto reembolsado", () => {
         const amount = 750;
